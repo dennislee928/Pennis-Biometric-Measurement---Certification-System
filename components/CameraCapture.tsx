@@ -4,12 +4,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getAverageLuminance,
   getBlurScore,
+  getMeasurementRoi,
+  validateMeasurementRegion,
+  computeFrameDifference,
   type MeasurementResult,
 } from '@/lib/measurementEngine';
+import { runRecognitionModel } from '@/lib/measurementVerification';
 import { useI18n } from '@/lib/i18n/context';
 import { Camera, AlertCircle, Loader2 } from 'lucide-react';
 
+const LIVENESS_DURATION_MS = 3000;
+const LIVENESS_SAMPLE_INTERVAL_MS = 220;
+const LIVENESS_MOTION_THRESHOLD = 4;
+
 export type CaptureState = 'idle' | 'live' | 'captured' | 'error';
+export type LivenessPhase = 'idle' | 'capturing' | 'timeout';
 
 export interface CameraCaptureProps {
   onCapture?: (imageData: ImageData, live: boolean) => void;
@@ -50,6 +59,11 @@ export function CameraCapture({
     sharp: true,
   });
   const lastCheckRef = useRef<number>(0);
+  const [livenessPhase, setLivenessPhase] = useState<LivenessPhase>('idle');
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const previousRoiRef = useRef<ImageData | null>(null);
+  const livenessStartRef = useRef<number>(0);
+  const livenessIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopStream = useCallback(() => {
     if (streamRef.current) {
@@ -114,24 +128,92 @@ export function CameraCapture({
     return () => clearInterval(interval);
   }, [state, checkEnvironment]);
 
-  const capture = useCallback(() => {
+  const clearLivenessInterval = useCallback(() => {
+    if (livenessIntervalRef.current) {
+      clearInterval(livenessIntervalRef.current);
+      livenessIntervalRef.current = null;
+    }
+  }, []);
+
+  const startLiveness = useCallback(() => {
+    setValidationError(null);
+    setLivenessPhase('capturing');
+    previousRoiRef.current = null;
+    livenessStartRef.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    if (livenessPhase !== 'capturing') return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.readyState < 2) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const live = true;
-    onCapture?.(imageData, live);
-    setState('captured');
-    // 零存儲：不寫入 localStorage / IndexedDB，影像僅在記憶體中傳遞，unmount 時 stream 與 canvas 清除
-  }, [onCapture]);
+
+    const tick = () => {
+      if (!video || !canvas || video.readyState < 2) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const roi = getMeasurementRoi(imageData);
+
+      const elapsed = Date.now() - livenessStartRef.current;
+      if (elapsed > LIVENESS_DURATION_MS) {
+        clearLivenessInterval();
+        setLivenessPhase('timeout');
+        return;
+      }
+
+      const prev = previousRoiRef.current;
+      previousRoiRef.current = roi;
+      if (prev) {
+        const diff = computeFrameDifference(prev, roi);
+        if (diff >= LIVENESS_MOTION_THRESHOLD) {
+          clearLivenessInterval();
+          const finalData = new ImageData(
+            new Uint8ClampedArray(imageData.data),
+            imageData.width,
+            imageData.height
+          );
+          const validation = validateMeasurementRegion(finalData);
+          if (!validation.valid) {
+            setValidationError(t('validation.regionInvalid'));
+            setLivenessPhase('idle');
+            return;
+          }
+          runRecognitionModel(getMeasurementRoi(finalData)).then((result) => {
+            if (!result.recognized) {
+              setValidationError(t('validation.regionInvalid'));
+              setLivenessPhase('idle');
+              return;
+            }
+            onCapture?.(finalData, true);
+            setState('captured');
+            setLivenessPhase('idle');
+          });
+        }
+      }
+    };
+
+    livenessIntervalRef.current = setInterval(tick, LIVENESS_SAMPLE_INTERVAL_MS);
+    return () => clearLivenessInterval();
+  }, [livenessPhase, clearLivenessInterval, onCapture, t]);
+
+  const handleLivenessRetry = useCallback(() => {
+    setLivenessPhase('idle');
+    setValidationError(null);
+  }, []);
+
+  const capture = useCallback(() => {
+    startLiveness();
+  }, [startLiveness]);
 
   const reset = useCallback(() => {
     setState('live');
+    setLivenessPhase('idle');
+    setValidationError(null);
+    previousRoiRef.current = null;
   }, []);
 
   const w = 640;
@@ -182,29 +264,41 @@ export function CameraCapture({
                 height: measurementHeight,
               }}
             />
-            <div
-              className="camera-overlay__hint"
-              style={{ left: 0, right: 0, top: refTop - 28 }}
-            >
-              {t('reference.passportHint')}
-            </div>
-            <div
-              className="camera-overlay__hint"
-              style={{ left: 0, right: 0, top: measurementTop - 24 }}
-            >
-              {t('reference.measurementFrameHint')}
-            </div>
-            <div
-              className="camera-overlay__hint"
-              style={{ left: 0, right: 0, bottom: 24 }}
-            >
-              {t('reference.captureHint')}
-            </div>
+            {livenessPhase !== 'capturing' && (
+              <>
+                <div
+                  className="camera-overlay__hint"
+                  style={{ left: 0, right: 0, top: refTop - 28 }}
+                >
+                  {t('reference.passportHint')}
+                </div>
+                <div
+                  className="camera-overlay__hint"
+                  style={{ left: 0, right: 0, top: measurementTop - 24 }}
+                >
+                  {t('reference.measurementFrameHint')}
+                </div>
+                <div
+                  className="camera-overlay__hint"
+                  style={{ left: 0, right: 0, bottom: 24 }}
+                >
+                  {t('reference.captureHint')}
+                </div>
+              </>
+            )}
+            {livenessPhase === 'capturing' && (
+              <div
+                className="camera-overlay__hint"
+                style={{ left: 8, right: 8, bottom: 24, fontSize: '0.8rem' }}
+              >
+                {t('liveness.prompt')}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {state === 'live' && (
+      {state === 'live' && livenessPhase !== 'capturing' && (
         <div className="flex items-center gap-4 text-sm">
           <span className={envOk.light ? 'text-green-600' : 'text-amber-600'}>
             {envOk.light ? t('camera.bright') : t('camera.dark')}
@@ -215,7 +309,20 @@ export function CameraCapture({
         </div>
       )}
 
-      {state === 'live' && (
+      {validationError && (
+        <div className="w-full rounded-lg bg-amber-50 p-4 text-amber-900 text-sm">
+          {validationError}
+          <button
+            type="button"
+            onClick={() => setValidationError(null)}
+            className="mt-2 block text-amber-700 underline"
+          >
+            {t('liveness.retry')}
+          </button>
+        </div>
+      )}
+
+      {state === 'live' && livenessPhase === 'idle' && !validationError && (
         <button
           type="button"
           onClick={capture}
@@ -225,6 +332,26 @@ export function CameraCapture({
           <Camera className="h-5 w-5" />
           {t('camera.capture')}
         </button>
+      )}
+
+      {state === 'live' && livenessPhase === 'capturing' && (
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          {t('liveness.prompt')}
+        </div>
+      )}
+
+      {state === 'live' && livenessPhase === 'timeout' && (
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-sm text-amber-700">{t('liveness.timeout')}</p>
+          <button
+            type="button"
+            onClick={handleLivenessRetry}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            {t('liveness.retry')}
+          </button>
+        </div>
       )}
 
       {state === 'captured' && (
