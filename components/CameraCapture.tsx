@@ -5,7 +5,6 @@ import {
   getAverageLuminance,
   getBlurScore,
   type MeasurementResult,
-  type Point2D,
 } from '@/lib/measurementEngine';
 import { Camera, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -44,7 +43,6 @@ export function CameraCapture({
     light: true,
     sharp: true,
   });
-  const [ppm, setPpm] = useState<number>(0);
   const lastCheckRef = useRef<number>(0);
 
   const stopStream = useCallback(() => {
@@ -127,7 +125,6 @@ export function CameraCapture({
 
   const reset = useCallback(() => {
     setState('live');
-    setPpm(0);
   }, []);
 
   const w = 640;
@@ -136,14 +133,6 @@ export function CameraCapture({
   const refLeft = (w - refW) / 2;
   const refTop = h * 0.15;
   const refBottom = refTop + refW * (85.6 / 53.98);
-  const cardCorners: [Point2D, Point2D, Point2D, Point2D] = [
-    { x: refLeft, y: refTop },
-    { x: refLeft + refW, y: refTop },
-    { x: refLeft + refW, y: refBottom },
-    { x: refLeft, y: refBottom },
-  ];
-
-  return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative overflow-hidden rounded-xl bg-black" style={{ width: w, height: h }}>
         <video

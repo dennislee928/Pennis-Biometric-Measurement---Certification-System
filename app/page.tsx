@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
+import { initTfBackend } from '@/lib/tfBackend';
 import {
   computePPMFromCard,
   measureLengthFromRegion,
