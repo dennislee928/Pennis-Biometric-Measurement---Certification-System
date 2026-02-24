@@ -254,6 +254,44 @@ export default function MeasurePage() {
               </div>
             </div>
 
+            {/* 資料收集（選填）：參與改進辨識模型 */}
+            <div className="mb-4 border-t border-slate-200 pt-4">
+              <h3 className="mb-2 text-sm font-semibold text-slate-800">協助改進辨識（選填）</h3>
+              <p className="mb-3 text-xs text-slate-500">
+                僅上傳當前擷取的測量區 ROI 圖與您選擇的標籤，用於改進「是否為真實目標」的辨識模型。可隨時略過。
+              </p>
+              <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={collectionConsent}
+                  onChange={(e) => setCollectionConsent(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                我同意將此張 ROI 圖與標籤用於模型改進（僅儲存於後端指定路徑，不另作他用）
+              </label>
+              {collectionConsent && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={collectionSending || collectionDone}
+                    onClick={() => handleSubmitCollection('recognized')}
+                    className="rounded border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    {collectionSending ? '上傳中…' : collectionDone ? '已送出' : '此張為真實'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={collectionSending || collectionDone}
+                    onClick={() => handleSubmitCollection('not_recognized')}
+                    className="rounded border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    {collectionSending ? '上傳中…' : collectionDone ? '已送出' : '此張為非真實'}
+                  </button>
+                </div>
+              )}
+              {collectionError && <p className="mt-2 text-xs text-red-600">{collectionError}</p>}
+            </div>
+
             <div className="flex gap-3">
               <button
                 type="button"

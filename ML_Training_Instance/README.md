@@ -81,6 +81,14 @@ data/
 python create_placeholder_data.py
 ```
 
+## 資料收集
+
+標註好的圖片可透過三種方式彙整到上述資料結構，詳見 **[DATA_COLLECTION.md](DATA_COLLECTION.md)**（含標註規範與合規注意事項）：
+
+- **方案 A（App 內收集）**：後端設定 `COLLECTION_STORAGE_PATH` 啟用 `POST /api/collection`，前端在測量結果頁可選「此張為真實／非真實」上傳 ROI 圖；再將後端目錄複製到 `data/raw/`。
+- **方案 B（離線標註）**：將待標圖片放到一目錄，執行 `python scripts/label_offline.py --input-dir ./data/to_label`，依提示輸入 1/0 後檔案會移至 `data/raw/recognized` 或 `data/raw/not_recognized`。
+- **方案 C（切分 train/val）**：在 `data/raw/` 有兩類子目錄後，執行 `python scripts/split_train_val.py` 會依比例寫入 `data/train/` 與 `data/val/`。
+
 ## 訓練
 
 從專案根目錄（即 `ML_Training_Instance/` 上一層）或從 `ML_Training_Instance` 內執行：

@@ -15,6 +15,9 @@ data/val/recognized/*
 data/val/not_recognized/*
 data/test/recognized/*
 data/test/not_recognized/*
+data/raw/recognized/*
+data/raw/not_recognized/*
+data/to_label/*
 !data/**/.gitkeep
 
 # Models
