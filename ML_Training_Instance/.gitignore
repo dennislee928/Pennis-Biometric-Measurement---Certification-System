@@ -1,0 +1,32 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Data (keep structure, ignore contents)
+data/train/recognized/*
+data/train/not_recognized/*
+data/val/recognized/*
+data/val/not_recognized/*
+data/test/recognized/*
+data/test/not_recognized/*
+!data/**/.gitkeep
+
+# Models
+*.h5
+*.keras
+saved_model/
+tfjs_model/
+output/
+*.pb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,0 +1,8 @@
+# 訓練與匯出（TensorFlow 2.12+ 與 TF.js 匯出相容）
+tensorflow>=2.12
+tensorflowjs>=4.14
+numpy
+Pillow
+
+# Gradio（HF Space 推論）
+gradio>=4.0
