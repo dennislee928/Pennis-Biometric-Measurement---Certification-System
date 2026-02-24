@@ -37,6 +37,14 @@ body {
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
 }
 
+/* 測量部位放置框（藍色），與護照框同時顯示 */
+.camera-overlay__frame-measurement {
+  position: absolute;
+  border: 3px solid rgba(59, 130, 246, 0.9);
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+}
+
 .camera-overlay__hint {
   position: absolute;
   color: white;

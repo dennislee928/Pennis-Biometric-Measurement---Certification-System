@@ -172,6 +172,40 @@ export default function MeasurePage() {
                 {t('step2.live')}: {measurement.liveCaptured ? t('step2.yes') : t('step2.no')} · PPM: {measurement.ppm.toFixed(1)}
               </p>
             </div>
+
+            <div className="mb-4 border-t border-slate-200 pt-4">
+              <h3 className="mb-3 text-sm font-semibold text-slate-800">{t('step2.certSectionTitle')}</h3>
+              <label htmlFor="step2-holder-name" className="mb-1 block text-sm font-medium text-slate-700">
+                {t('step4.holderName')}
+              </label>
+              <input
+                id="step2-holder-name"
+                type="text"
+                value={holderName}
+                onChange={(e) => setHolderName(e.target.value)}
+                placeholder={t('step4.holderNamePlaceholder')}
+                className="mb-4 w-full rounded border border-slate-300 px-3 py-2 text-slate-900 placeholder:text-slate-400"
+              />
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleDownloadPng}
+                  className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm text-white hover:bg-slate-800"
+                >
+                  <Download className="h-4 w-4" />
+                  {t('step4.downloadPng')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm text-white hover:bg-slate-800"
+                >
+                  <Download className="h-4 w-4" />
+                  {t('step4.downloadPdf')}
+                </button>
+              </div>
+            </div>
+
             <div className="flex gap-3">
               <button
                 type="button"

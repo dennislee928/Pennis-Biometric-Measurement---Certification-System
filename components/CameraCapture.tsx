@@ -141,6 +141,15 @@ export function CameraCapture({
   const refTop = h * 0.15;
   const refBottom = refTop + refW * frameAspect;
 
+  /* 測量框：畫面下方 48% 起、高度 35%、寬度 50% 置中（與 measure page 的 targetRegionHeightPx 對應） */
+  const measurementTopRatio = 0.48;
+  const measurementHeightRatio = 0.35;
+  const measurementWidthRatio = 0.5;
+  const measurementLeft = (w - w * measurementWidthRatio) / 2;
+  const measurementTop = h * measurementTopRatio;
+  const measurementWidth = w * measurementWidthRatio;
+  const measurementHeight = h * measurementHeightRatio;
+
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative overflow-hidden rounded-xl bg-black" style={{ width: w, height: h }}>
@@ -165,10 +174,25 @@ export function CameraCapture({
               }}
             />
             <div
+              className="camera-overlay__frame-measurement"
+              style={{
+                left: measurementLeft,
+                top: measurementTop,
+                width: measurementWidth,
+                height: measurementHeight,
+              }}
+            />
+            <div
               className="camera-overlay__hint"
               style={{ left: 0, right: 0, top: refTop - 28 }}
             >
               {t('reference.passportHint')}
+            </div>
+            <div
+              className="camera-overlay__hint"
+              style={{ left: 0, right: 0, top: measurementTop - 24 }}
+            >
+              {t('reference.measurementFrameHint')}
             </div>
             <div
               className="camera-overlay__hint"
