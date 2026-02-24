@@ -225,52 +225,49 @@ export default function MeasurePage() {
                 {t('step4.inquiryId')}: <code className="rounded bg-slate-100 px-1">{inquiryId}</code>
               </p>
             )}
-            {!accessToken ? (
-              <div className="rounded-lg bg-amber-50 p-4 text-amber-800">
-                <p className="mb-2">{t('step4.loginRequired')}</p>
-                <Link href="/login" className="text-sm font-medium underline">{t('step4.goLogin')}</Link>
+            {accessToken && (
+              <div className="mb-4 rounded-lg bg-emerald-50 p-4">
+                <p className="flex items-center gap-2 text-emerald-800">
+                  <CheckCircle className="h-5 w-5" />
+                  {t('step4.certReady')}
+                </p>
               </div>
-            ) : (
+            )}
+            <div className="mb-4">
+              <label htmlFor="holder-name" className="mb-1 block text-sm font-medium text-slate-700">
+                {t('step4.holderName')}
+              </label>
+              <input
+                id="holder-name"
+                type="text"
+                value={holderName}
+                onChange={(e) => setHolderName(e.target.value)}
+                placeholder={t('step4.holderNamePlaceholder')}
+                className="w-full rounded border border-slate-300 px-3 py-2 text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+            <div className="mb-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleDownloadPng}
+                disabled={pngDownloaded}
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Download className="h-4 w-4" />
+                {pngDownloaded ? t('step4.downloaded') : t('step4.downloadPng')}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={pdfDownloaded}
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Download className="h-4 w-4" />
+                {pdfDownloaded ? t('step4.downloaded') : t('step4.downloadPdf')}
+              </button>
+            </div>
+            {accessToken ? (
               <>
-                <div className="mb-4 rounded-lg bg-emerald-50 p-4">
-                  <p className="flex items-center gap-2 text-emerald-800">
-                    <CheckCircle className="h-5 w-5" />
-                    {t('step4.certReady')}
-                  </p>
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="holder-name" className="mb-1 block text-sm font-medium text-slate-700">
-                    {t('step4.holderName')}
-                  </label>
-                  <input
-                    id="holder-name"
-                    type="text"
-                    value={holderName}
-                    onChange={(e) => setHolderName(e.target.value)}
-                    placeholder={t('step4.holderNamePlaceholder')}
-                    className="w-full rounded border border-slate-300 px-3 py-2 text-slate-900 placeholder:text-slate-400"
-                  />
-                </div>
-                <div className="mb-4 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={handleDownloadPng}
-                    disabled={pngDownloaded}
-                    className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <Download className="h-4 w-4" />
-                    {pngDownloaded ? t('step4.downloaded') : t('step4.downloadPng')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDownloadPdf}
-                    disabled={pdfDownloaded}
-                    className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <Download className="h-4 w-4" />
-                    {pdfDownloaded ? t('step4.downloaded') : t('step4.downloadPdf')}
-                  </button>
-                </div>
                 {certError && <p className="mb-2 text-sm text-red-600">{certError}</p>}
                 <button
                   type="button"
@@ -281,6 +278,11 @@ export default function MeasurePage() {
                   {t('step4.downloadJson')}
                 </button>
               </>
+            ) : (
+              <div className="rounded-lg bg-amber-50 p-4 text-amber-800">
+                <p className="mb-2">{t('step4.loginRequiredJson')}</p>
+                <Link href="/login" className="text-sm font-medium underline">{t('step4.goLogin')}</Link>
+              </div>
             )}
           </section>
         )}

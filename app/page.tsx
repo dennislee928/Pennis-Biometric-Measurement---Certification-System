@@ -31,6 +31,20 @@ export default function WelcomePage() {
           <h1 className="text-3xl font-bold text-slate-900">{t('welcome.title')}</h1>
           <p className="mt-4 text-slate-600">{t('welcome.subtitle')}</p>
         </header>
+        <div className="w-full rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4 text-left text-sm text-amber-900">
+          {t('welcome.disclaimer')}
+        </div>
+        <div className="w-full text-left">
+          <h2 className="text-lg font-semibold text-slate-800">{t('welcome.noticeTitle')}</h2>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-slate-600">
+            {t('welcome.noticeItems')
+              .split('\n')
+              .filter(Boolean)
+              .map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+          </ul>
+        </div>
         <Link
           href="/measure"
           className="inline-block rounded-lg bg-emerald-600 px-8 py-3 text-lg font-medium text-white hover:bg-emerald-700 transition"

@@ -3,8 +3,8 @@ import './globals.css';
 import { I18nProvider } from '@/lib/i18n/context';
 
 export const metadata: Metadata = {
-  title: 'Biometric Measurement & Certification',
-  description: 'On-device measurement with identity verification. No images leave your device.',
+  title: 'Male Penis Length & Size Measurement',
+  description: 'On-device male penis length and size measurement. No images leave your device. Identity verification for a digital certificate.',
 };
 
 export default function RootLayout({
