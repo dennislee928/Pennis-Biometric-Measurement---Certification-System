@@ -121,6 +121,7 @@ export function CameraCapture({
     const live = true;
     onCapture?.(imageData, live);
     setState('captured');
+    // 零存儲：不寫入 localStorage / IndexedDB，影像僅在記憶體中傳遞，unmount 時 stream 與 canvas 清除
   }, [onCapture]);
 
   const reset = useCallback(() => {
@@ -133,6 +134,8 @@ export function CameraCapture({
   const refLeft = (w - refW) / 2;
   const refTop = h * 0.15;
   const refBottom = refTop + refW * (85.6 / 53.98);
+
+  return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative overflow-hidden rounded-xl bg-black" style={{ width: w, height: h }}>
         <video

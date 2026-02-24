@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@mediapipe/selfie_segmentation": "^0.1.1697467922",
     "@tensorflow/tfjs": "^4.15.0",
     "canvas-confetti": "^1.9.2",
     "lucide-react": "^0.312.0",
