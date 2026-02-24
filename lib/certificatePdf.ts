@@ -52,7 +52,7 @@ export function generateCertificatePdf(data: CertificatePdfData, locale: Locale)
   doc.setTextColor(200, 203, 210);
   doc.setFontSize(48);
   doc.setFont('helvetica', 'bold');
-  doc.text('OFFICIAL', pageW / 2, pageH / 2, { align: 'center' });
+  doc.text('Dick Size Verified', pageW / 2, pageH / 2, { align: 'center' });
   doc.setTextColor(0, 0, 0);
 
   let y = 28;
