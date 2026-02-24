@@ -1,29 +1,48 @@
 # Biometric Measurement & Certification System
 
-基於 Next.js 的純前端應用：瀏覽器端 AI 輔助測量 + 第三方身分驗證（Persona），取得數位認證證書。**影像不離開裝置**（On-device Processing），僅傳輸測量結果與驗證標識。
+基於 Next.js 前端 + Go 後端 + Supabase：瀏覽器端測量、Persona 身分驗證、**後端持密鑰簽發證書**、證書驗證與「我的證書」查詢。**影像不離開裝置**，僅傳輸測量結果與驗證標識。
 
 ## 技術棧
 
-- **Next.js 14+** (App Router)
-- **TensorFlow.js**（WASM/CPU 後端）
-- **Persona**（Embedded Inquiry 身分驗證）
-- **canvas-confetti**、**lucide-react**
+- **Next.js 14+** (App Router)、**Supabase Auth**（登入／證書綁定）
+- **Go (Gin + GORM)** 後端、**Supabase PostgreSQL**（inquiries、certificates、audit_logs）
+- **TensorFlow.js**、**Persona**（Embedded Inquiry + Webhook）、**canvas-confetti**、**lucide-react**
 
 ## 環境需求
 
-- Node.js 18+
+- Node.js 18+、Go 1.21+
+- Supabase 專案（Auth + PostgreSQL）
 - 支援 `getUserMedia` 的瀏覽器（建議 HTTPS 或 localhost）
 
 ## 快速開始
 
+### 1. 資料庫（Supabase）
+
+在 Supabase SQL Editor 執行：
+
 ```bash
-# 安裝依賴
+# 見 database/migrations/001_create_inquiries_certificates_audit.sql
+```
+
+或直接執行 `database/migrations/001_create_inquiries_certificates_audit.sql` 內容。
+
+### 2. 後端（Go）
+
+```bash
+cd backend
+cp .env.example .env
+# 編輯 .env：DATABASE_URL、CERT_HMAC_SECRET、PERSONA_WEBHOOK_SECRET、SUPABASE_JWT_SECRET
+go run .
+```
+
+預設聽取 `:8080`。
+
+### 3. 前端（Next.js）
+
+```bash
 npm install
-
-# 複製環境變數（可選，用於 Persona 與證書簽名）
 cp .env.example .env.local
-
-# 開發
+# 編輯 .env.local：NEXT_PUBLIC_API_URL、NEXT_PUBLIC_SUPABASE_*、NEXT_PUBLIC_PERSONA_*
 npm run dev
 ```
 
@@ -31,54 +50,70 @@ npm run dev
 
 ## 環境變數
 
+### 前端 (.env.local)
+
 | 變數 | 說明 |
 |------|------|
-| `NEXT_PUBLIC_PERSONA_TEMPLATE_ID` | Persona Inquiry Template ID（Dashboard 建立後取得） |
+| `NEXT_PUBLIC_PERSONA_TEMPLATE_ID` | Persona Inquiry Template ID |
 | `NEXT_PUBLIC_PERSONA_ENV` | `sandbox` 或 `production` |
-| `NEXT_PUBLIC_CERT_SECRET_KEY` | 證書 HMAC 簽名用密鑰（正式環境應由後端簽名） |
+| `NEXT_PUBLIC_API_URL` | 後端 API 網址（例 `http://localhost:8080`） |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 專案 URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 
-未設定時，Persona 使用 placeholder template ID，證書使用預設 demo 密鑰。
+### 後端 (backend/.env)
 
-## 隱私與合規
+| 變數 | 說明 |
+|------|------|
+| `DATABASE_URL` | Supabase PostgreSQL 連線字串 |
+| `CERT_HMAC_SECRET` | 證書 HMAC 密鑰（僅後端） |
+| `PERSONA_WEBHOOK_SECRET` | Persona Webhook 簽名驗證 |
+| `SUPABASE_JWT_SECRET` | 驗證前端 JWT（Supabase Dashboard → API → JWT Secret） |
+| `CORS_ORIGIN` | 前端 origin（例 `http://localhost:3000`） |
 
-- **端點脫敏**：預覽畫面可啟用 `enableBlur`，對敏感區域套用 CSS `blur`。
-- **零存儲**：影像與影格不寫入 `localStorage`、`IndexedDB` 或任何持久化儲存；僅在記憶體中處理，unmount 時相機 stream 與 canvas 會清除。
+## 流程概覽
+
+1. **登入**：Supabase Auth（/login：密碼或魔法連結）。
+2. **相機擷取**：對齊參考卡片於綠色框，通過亮度/模糊檢測後擷取。
+3. **測量結果**：PPM 轉換為公分，標記即時擷取（Liveness）。
+4. **身分驗證**：Persona Embedded Inquiry → Persona 以 **Webhook** 通知後端 `inquiry.completed`，後端寫入 `inquiries`。
+5. **數位證書**：前端送 `inquiryId` + `measurement` 至 **POST /api/certificates**（帶 JWT），後端驗證 inquiry 已通過、簽名並寫入 `certificates`，回傳證書 JSON 供下載。
+6. **我的證書**：/certificates 呼叫 **GET /api/certificates**，多裝置同步。
+7. **驗證證書**：/verify 貼上證書 JSON，**POST /api/certificates/verify** 回傳有效/無效。
 
 ## 專案結構
 
 ```
 app/
-  layout.tsx, page.tsx, globals.css   # 首頁與流程
+  page.tsx           # 首頁流程（測量 → Persona → 證書）
+  login/page.tsx     # 登入
+  certificates/page.tsx  # 我的證書
+  verify/page.tsx    # 驗證證書
 components/
-  CameraCapture.tsx                   # 相機引導、光線/模糊檢測、擷取
-  PersonaInquiry.tsx                 # Persona 身分驗證 hook
+  CameraCapture.tsx, PersonaInquiry.tsx
 lib/
-  tfBackend.ts                        # TensorFlow.js 後端初始化（WASM/CPU）
-  measurementEngine.ts                # PPM 標定、透視變換、物理單位轉換
-  certificationProvider.ts            # 證書生成與 HMAC-SHA256 簽名
+  supabase.ts, useAuth.ts, api.ts, tfBackend.ts, measurementEngine.ts, certificationProvider.ts
+backend/             # Go API
+  main.go
+  internal/config, db, model, middleware, handler
+database/migrations/
+  001_create_inquiries_certificates_audit.sql
 ```
 
-## 流程概覽
+## Persona Webhook
 
-1. **相機擷取**：對齊參考卡片（如信用卡）於綠色框，通過亮度/模糊檢測後擷取。
-2. **測量結果**：依參考物寬度計算 PPM，轉換為公分；標記為即時擷取（Liveness）。
-3. **身分驗證**：透過 Persona Embedded Inquiry 完成證件與人臉掃描，取得 `inquiry_id`。
-4. **數位證書**：以 `inquiry_id` + 測量結果 + timestamp 簽名，產生可下載的 JSON 證書。
+在 Persona Dashboard 設定 Webhook URL：`https://<你的後端>/webhooks/persona`，訂閱 `inquiry.completed`，並將 Webhook secret 設為後端 `PERSONA_WEBHOOK_SECRET`。
+
+## 隱私與合規
+
+- **端點脫敏**：預覽可啟用 `enableBlur`（CSS blur）。
+- **零存儲**：影像不寫入 localStorage/IndexedDB；證書與稽核僅存於後端 DB，不存生物特徵。
 
 ## 建置與部署
 
 ```bash
-npm run build
-npm start
+# 前端
+npm run build && npm start
+
+# 後端
+cd backend && go build -o cert-backend . && ./cert-backend
 ```
-
-## 計畫對照
-
-實作對應 `.cursor/plans/cursor.plan.md`：
-
-- [x] 階段一：環境初始化、相機模組、光線/模糊檢測
-- [x] 階段二：TF.js 後端、measurementEngine（PPM、透視變換、物理單位）
-- [x] 階段三：Persona 串接、certificationProvider 加簽、Liveness 標記
-- [x] 階段四：Client-side Blur、零存儲架構
-
-語義分割模型（區分背景/參考物/目標）可後續接上 `@mediapipe/tasks-vision` 或自訂模型以提升測量精度。

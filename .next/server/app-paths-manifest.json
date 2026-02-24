@@ -1,3 +1,7 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/certificates/page": "app/certificates/page.js",
+  "/login/page": "app/login/page.js",
+  "/verify/page": "app/verify/page.js",
   "/page": "app/page.js"
 }

@@ -28,6 +28,14 @@ export async function listCertificates(accessToken: string) {
   return res.json();
 }
 
+export async function getCertificate(accessToken: string, id: string) {
+  const res = await fetch(`${API_URL}/api/certificates/${id}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(res.statusText);
+  return res.json();
+}
+
 export async function verifyCertificate(cert: {
   inquiryId: string;
   measurement: { lengthCm: number; ppm: number; timestamp: number; liveCaptured: boolean };

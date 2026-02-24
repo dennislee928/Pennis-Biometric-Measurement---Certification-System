@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/useAuth';
-import { listCertificates } from '@/lib/api';
+import { listCertificates, getCertificate } from '@/lib/api';
 import { downloadCertificateAsJson } from '@/lib/certificationProvider';
 
 type CertItem = { id: string; inquiryId: string; issuedAt: string; lengthCm: number; signature: string };
@@ -25,14 +25,14 @@ export default function CertificatesPage() {
       .finally(() => setLoading(false));
   }, [accessToken]);
 
-  const handleDownload = (item: CertItem) => {
-    downloadCertificateAsJson({
-      inquiryId: item.inquiryId,
-      measurement: { lengthCm: item.lengthCm, ppm: 0, timestamp: 0, liveCaptured: true },
-      issuedAt: item.issuedAt,
-      nonce: '',
-      signature: item.signature,
-    } as Parameters<typeof downloadCertificateAsJson>[0]);
+  const handleDownload = async (id: string) => {
+    if (!accessToken) return;
+    try {
+      const cert = await getCertificate(accessToken, id);
+      downloadCertificateAsJson(cert);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '下載失敗');
+    }
   };
 
   return (
@@ -61,7 +61,7 @@ export default function CertificatesPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleDownload(item)}
+                      onClick={() => handleDownload(item.id)}
                       className="rounded bg-slate-800 px-3 py-1.5 text-sm text-white hover:bg-slate-700"
                     >
                       下載

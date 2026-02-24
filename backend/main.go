@@ -42,10 +42,11 @@ func main() {
 
 	api := r.Group("/api")
 	api.POST("/certificates/verify", handler.VerifyCertificate(cfg.CERTHMACSecret))
-	api.Use(middleware.AuthJWT(cfg.SupabaseJWTSecret))
+		api.Use(middleware.AuthJWT(cfg.SupabaseJWTSecret))
 	{
 		api.POST("/certificates", handler.IssueCertificate(cfg.CERTHMACSecret, database))
 		api.GET("/certificates", handler.ListCertificates(database))
+		api.GET("/certificates/:id", handler.GetCertificate(database))
 	}
 
 	port := cfg.Port

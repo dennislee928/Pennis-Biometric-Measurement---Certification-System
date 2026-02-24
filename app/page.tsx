@@ -117,7 +117,7 @@ export default function Home() {
       <div className="mx-auto max-w-2xl space-y-8">
         <header className="text-center">
           <h1 className="text-2xl font-bold text-slate-900">
-            生物測量與認證系統
+            生物測量與認證系統(請測量陰莖長度)
           </h1>
           <p className="mt-2 text-sm text-slate-600">
             端上測量 · 影像不離裝置 · 身分驗證後取得數位證書

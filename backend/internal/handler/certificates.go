@@ -168,6 +168,41 @@ func ListCertificates(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func GetCertificate(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userIDStr, _ := c.Get(middleware.UserIDKey)
+		userID, err := uuid.Parse(userIDStr.(string))
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid user id"})
+			return
+		}
+		idStr := c.Param("id")
+		certID, err := uuid.Parse(idStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid certificate id"})
+			return
+		}
+		var cert model.Certificate
+		if err := db.Where("id = ? AND user_id = ?", certID, userID).First(&cert).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "certificate not found"})
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+			return
+		}
+		var m MeasurementResult
+		_ = json.Unmarshal(cert.Measurement, &m)
+		c.JSON(http.StatusOK, CertificatePayload{
+			InquiryID:   cert.InquiryID,
+			Measurement: m,
+			IssuedAt:    cert.IssuedAt.Format(time.RFC3339),
+			Nonce:       cert.Nonce,
+			Signature:   cert.Signature,
+		})
+	}
+}
+
 type VerifyRequest struct {
 	InquiryID   string            `json:"inquiryId"`
 	Measurement MeasurementResult `json:"measurement"`
