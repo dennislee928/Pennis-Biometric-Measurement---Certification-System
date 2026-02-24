@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { initTfBackend } from '@/lib/tfBackend';
 import {
   computePPMFromPassport,
+  getMeasurementRoi,
   measureLengthFromRegion,
   type MeasurementResult,
   type Point2D,
@@ -12,7 +13,7 @@ import {
 import { downloadCertificateAsJson, type CertificatePayload } from '@/lib/certificationProvider';
 import { downloadCertificatePng } from '@/lib/certificateImage';
 import { generateCertificatePdf } from '@/lib/certificatePdf';
-import { issueCertificate } from '@/lib/api';
+import { issueCertificate, submitCollection } from '@/lib/api';
 import { useAuth } from '@/lib/useAuth';
 import { getSupabase } from '@/lib/supabase';
 import { useI18n } from '@/lib/i18n/context';
@@ -47,6 +48,21 @@ function runMeasurement(imageData: ImageData, liveCaptured: boolean): Measuremen
   return measureLengthFromRegion(targetRegionHeightPx, ppm, liveCaptured);
 }
 
+function roiImageDataToPngBlob(roi: ImageData): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = roi.width;
+    canvas.height = roi.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      reject(new Error('Canvas context unavailable'));
+      return;
+    }
+    ctx.putImageData(roi, 0, 0);
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), 'image/png');
+  });
+}
+
 export default function MeasurePage() {
   const { t, locale } = useI18n();
   const [step, setStep] = useState<'camera' | 'measure' | 'verify' | 'cert'>('camera');
@@ -56,16 +72,28 @@ export default function MeasurePage() {
   const [holderName, setHolderName] = useState('');
   const [pngDownloaded, setPngDownloaded] = useState(false);
   const [pdfDownloaded, setPdfDownloaded] = useState(false);
+  const [collectionConsent, setCollectionConsent] = useState(false);
+  const [collectionSending, setCollectionSending] = useState(false);
+  const [collectionError, setCollectionError] = useState<string | null>(null);
+  const [collectionDone, setCollectionDone] = useState(false);
+  const lastCapturedRef = useRef<ImageData | null>(null);
 
   useEffect(() => {
     initTfBackend().catch(() => {});
   }, []);
 
   const handleCapture = useCallback((imageData: ImageData, live: boolean) => {
+    lastCapturedRef.current = new ImageData(
+      new Uint8ClampedArray(imageData.data),
+      imageData.width,
+      imageData.height
+    );
     const result = runMeasurement(imageData, live);
     if (result) {
       setMeasurement(result);
       setStep('measure');
+      setCollectionDone(false);
+      setCollectionError(null);
     }
   }, []);
 
@@ -123,6 +151,26 @@ export default function MeasurePage() {
     generateCertificatePdf(certData, locale);
     setPdfDownloaded(true);
   }, [certData, locale]);
+
+  const handleSubmitCollection = useCallback(
+    async (label: 'recognized' | 'not_recognized') => {
+      const full = lastCapturedRef.current;
+      if (!full) return;
+      setCollectionSending(true);
+      setCollectionError(null);
+      try {
+        const roi = getMeasurementRoi(full);
+        const blob = await roiImageDataToPngBlob(roi);
+        await submitCollection(blob, label);
+        setCollectionDone(true);
+      } catch (e) {
+        setCollectionError(e instanceof Error ? e.message : 'Upload failed');
+      } finally {
+        setCollectionSending(false);
+      }
+    },
+    []
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8">

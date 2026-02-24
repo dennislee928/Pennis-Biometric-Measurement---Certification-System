@@ -51,3 +51,20 @@ export async function verifyCertificate(cert: {
   if (!res.ok) throw new Error(res.statusText);
   return res.json();
 }
+
+/** 上傳 ROI 圖與標籤至資料收集 API（需後端設定 COLLECTION_STORAGE_PATH） */
+export async function submitCollection(
+  imageBlob: Blob,
+  label: 'recognized' | 'not_recognized'
+): Promise<{ ok: boolean; path?: string }> {
+  const form = new FormData();
+  form.append('image', imageBlob, 'roi.png');
+  form.append('label', label);
+  const res = await fetch(`${API_URL}/api/collection`, {
+    method: 'POST',
+    body: form,
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean; path?: string };
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return { ok: data.ok ?? true, path: data.path };
+}

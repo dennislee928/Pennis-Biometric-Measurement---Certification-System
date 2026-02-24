@@ -81,4 +81,5 @@ def build_ui():
 
 if __name__ == "__main__":
     demo = build_ui()
-    demo.launch()
+    # 容器內需綁定 0.0.0.0 才能從 host 連線
+    demo.launch(server_name="0.0.0.0", server_port=7860)

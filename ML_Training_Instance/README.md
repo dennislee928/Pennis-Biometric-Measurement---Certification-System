@@ -12,6 +12,52 @@ app_file: app.py
 - Python 3.9+
 - 安裝依賴：`pip install -r requirements.txt`
 
+## 使用 Docker 執行
+
+在 `ML_Training_Instance` 目錄下建置並執行：
+
+```bash
+cd ML_Training_Instance
+docker build -t ml-training .
+```
+
+**僅用 placeholder 資料跑通流程（預設 CMD）：**
+
+```bash
+docker run --rm ml-training
+```
+
+**掛載本機資料並訓練，產出模型寫回本機：**
+
+```bash
+docker run --rm \
+  -v "$(pwd)/data:/app/data" \
+  -v "$(pwd)/saved_model:/app/saved_model" \
+  ml-training \
+  sh -c "python -m src.train --epochs 10 --batch 32"
+```
+
+**訓練完成後在容器內匯出 TF.js，並將產出複製到本機：**
+
+```bash
+docker run --rm \
+  -v "$(pwd)/saved_model:/app/saved_model" \
+  -v "$(pwd)/tfjs_model:/app/tfjs_model" \
+  ml-training \
+  sh -c "python -m src.export_tfjs --input /app/saved_model --output /app/tfjs_model"
+```
+
+**改跑 Gradio App（需先有 saved_model，可掛載）：**
+
+```bash
+docker run --rm -p 7860:7860 \
+  -v "$(pwd)/saved_model:/app/saved_model" \
+  ml-training \
+  python app.py
+```
+
+瀏覽器開啟 `http://localhost:7860`。
+
 ## 資料結構
 
 請將標註好的圖片放入以下資料夾（每類一個子資料夾）：

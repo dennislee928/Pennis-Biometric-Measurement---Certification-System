@@ -42,7 +42,9 @@ func main() {
 
 	api := r.Group("/api")
 	api.POST("/certificates/verify", handler.VerifyCertificate(cfg.CERTHMACSecret))
-		api.Use(middleware.AuthJWT(cfg.SupabaseJWTSecret))
+	// 資料收集：ROI 圖 + 標籤，不需登入；需設定 COLLECTION_STORAGE_PATH 才啟用
+	api.POST("/collection", handler.SubmitCollection(cfg.CollectionStoragePath))
+	api.Use(middleware.AuthJWT(cfg.SupabaseJWTSecret))
 	{
 		api.POST("/certificates", handler.IssueCertificate(cfg.CERTHMACSecret, database))
 		api.GET("/certificates", handler.ListCertificates(database))
