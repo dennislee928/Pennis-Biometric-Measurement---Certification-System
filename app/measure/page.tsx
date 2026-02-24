@@ -10,6 +10,8 @@ import {
   type Point2D,
 } from '@/lib/measurementEngine';
 import { downloadCertificateAsJson, type CertificatePayload } from '@/lib/certificationProvider';
+import { downloadCertificatePng } from '@/lib/certificateImage';
+import { generateCertificatePdf } from '@/lib/certificatePdf';
 import { issueCertificate } from '@/lib/api';
 import { useAuth } from '@/lib/useAuth';
 import { getSupabase } from '@/lib/supabase';
@@ -46,11 +48,14 @@ function runMeasurement(imageData: ImageData, liveCaptured: boolean): Measuremen
 }
 
 export default function MeasurePage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [step, setStep] = useState<'camera' | 'measure' | 'verify' | 'cert'>('camera');
   const [measurement, setMeasurement] = useState<MeasurementResult | null>(null);
   const [certificate, setCertificate] = useState<CertificatePayload | null>(null);
   const [inquiryId, setInquiryId] = useState<string | null>(null);
+  const [holderName, setHolderName] = useState('');
+  const [pngDownloaded, setPngDownloaded] = useState(false);
+  const [pdfDownloaded, setPdfDownloaded] = useState(false);
 
   useEffect(() => {
     initTfBackend().catch(() => {});
@@ -97,6 +102,27 @@ export default function MeasurePage() {
       setCertError(e instanceof Error ? e.message : t('error.issueFailed'));
     }
   }, [inquiryId, measurement, accessToken, t]);
+
+  const certData = measurement
+    ? {
+        holderName,
+        lengthCm: measurement.lengthCm,
+        issuedAt: certificate?.issuedAt ?? new Date().toISOString(),
+        inquiryId: inquiryId ?? undefined,
+      }
+    : null;
+
+  const handleDownloadPng = useCallback(() => {
+    if (!certData) return;
+    downloadCertificatePng(certData, locale);
+    setPngDownloaded(true);
+  }, [certData, locale]);
+
+  const handleDownloadPdf = useCallback(() => {
+    if (!certData) return;
+    generateCertificatePdf(certData, locale);
+    setPdfDownloaded(true);
+  }, [certData, locale]);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8">
