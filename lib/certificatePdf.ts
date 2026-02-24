@@ -12,7 +12,8 @@ export interface CertificatePdfData {
 export function generateCertificatePdf(data: CertificatePdfData, locale: Locale): void {
   const doc = new jsPDF();
   const dict = messages[locale];
-  const pageW = doc.getPageWidth();
+  const pageW = 210; // A4 mm
+  const pageH = 297;
   const margin = 20;
   let y = 25;
 
@@ -34,7 +35,7 @@ export function generateCertificatePdf(data: CertificatePdfData, locale: Locale)
     y += 10;
   }
 
-  y = doc.getPageHeight() - 20;
+  y = pageH - 20;
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
   doc.text(dict['cert.footer'] ?? 'On-device measurement. Identity verified via Persona.', pageW / 2, y, { align: 'center' });
