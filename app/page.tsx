@@ -54,6 +54,10 @@ export default function Home() {
   const [certificate, setCertificate] = useState<CertificatePayload | null>(null);
   const [inquiryId, setInquiryId] = useState<string | null>(null);
 
+  useEffect(() => {
+    initTfBackend().catch(() => {});
+  }, []);
+
   const handleCapture = useCallback((imageData: ImageData, live: boolean) => {
     const result = runMeasurement(imageData, live);
     if (result) {
