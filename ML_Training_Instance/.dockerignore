@@ -1,0 +1,36 @@
+# 虛擬環境與快取
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.eggs/
+dist/
+build/
+
+# 模型輸出（改由 volume 掛載或建置後複製）
+saved_model/
+tfjs_model/
+*.h5
+*.keras
+output/
+
+# 資料目錄內容不打包進 image，改由 volume 掛載
+data/train/recognized/*
+data/train/not_recognized/*
+data/val/recognized/*
+data/val/not_recognized/*
+data/test/recognized/*
+data/test/not_recognized/*
+
+# Git 與 IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 文件與 Docker 本身（可選，不影響執行）
+README.md
+Dockerfile
+.dockerignore
