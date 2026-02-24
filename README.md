@@ -59,6 +59,7 @@ npm run dev
 | `NEXT_PUBLIC_API_URL` | 後端 API 網址（例 `http://localhost:8080`） |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 專案 URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `NEXT_PUBLIC_MEASUREMENT_RECOGNITION_MODEL_URL` | 測量區 ML 辨識模型 URL（TF.js GraphModel），不設定則跳過辨識 |
 
 ### 後端 (backend/.env)
 
@@ -102,6 +103,17 @@ database/migrations/
 ## Persona Webhook
 
 在 Persona Dashboard 設定 Webhook URL：`https://<你的後端>/webhooks/persona`，訂閱 `inquiry.completed`，並將 Webhook secret 設為後端 `PERSONA_WEBHOOK_SECRET`。
+
+## 測量區 ML 辨識模型（可選）
+
+若設定 `NEXT_PUBLIC_MEASUREMENT_RECOGNITION_MODEL_URL`，前端會以 TensorFlow.js 載入 **GraphModel**（JSON + 權重 shard）對測量區 ROI 做推論。
+
+- **格式**：TF.js GraphModel（可由 Keras/PyTorch 轉換）。
+- **輸入**：224×224 RGB，數值正規化至 [0, 1]。
+- **輸出假設**：二元分類，`result[1]` 為「已辨識」類別機率；門檻 0.8 判定通過。若實際模型為單一 sigmoid，需在程式內改為取 `result[0]`。
+- **量化**：若使用 uint8 量化模型，轉換與前處理需與上述輸入規範一致。
+
+未設定時不載入模型，辨識步驟一律通過。
 
 ## 隱私與合規
 
