@@ -10,14 +10,14 @@ import {
   type MeasurementResult,
   type Point2D,
 } from '@/lib/measurementEngine';
-import {
-  createCertificate,
-  downloadCertificateAsJson,
-  type CertificatePayload,
-} from '@/lib/certificationProvider';
+import { downloadCertificateAsJson, type CertificatePayload } from '@/lib/certificationProvider';
+import { issueCertificate } from '@/lib/api';
+import { useAuth } from '@/lib/useAuth';
+import { getSupabase } from '@/lib/supabase';
 import { CameraCapture } from '@/components/CameraCapture';
 import { usePersonaInquiry } from '@/components/PersonaInquiry';
 import { Shield, Download, Loader2, CheckCircle } from 'lucide-react';
+import Link from 'next/link';
 
 const REFERENCE_FRAME_WIDTH_RATIO = 0.25;
 
@@ -78,6 +78,9 @@ export default function Home() {
     }
   );
 
+  const { session, loading: authLoading, accessToken } = useAuth();
+  const [certError, setCertError] = useState<string | null>(null);
+
   const handleStartVerification = useCallback(() => {
     setStep('verify');
     openPersona();
@@ -85,15 +88,32 @@ export default function Home() {
 
   const handleDownloadCert = useCallback(async () => {
     if (!inquiryId || !measurement) return;
-    const secretKey = process.env.NEXT_PUBLIC_CERT_SECRET_KEY || 'demo-secret-do-not-use-in-production';
-    const cert = await createCertificate(inquiryId, measurement, secretKey);
-    setCertificate(cert);
-    downloadCertificateAsJson(cert);
-    confetti({ particleCount: 80, spread: 60 });
-  }, [inquiryId, measurement]);
+    if (!accessToken) return;
+    setCertError(null);
+    try {
+      const cert = await issueCertificate(accessToken, inquiryId, measurement);
+      setCertificate(cert);
+      downloadCertificateAsJson(cert as CertificatePayload);
+      confetti({ particleCount: 80, spread: 60 });
+    } catch (e) {
+      setCertError(e instanceof Error ? e.message : '簽發失敗');
+    }
+  }, [inquiryId, measurement, accessToken]);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8">
+      <nav className="mx-auto mb-6 flex max-w-2xl items-center justify-end gap-4 text-sm">
+        <Link href="/verify" className="text-slate-600 hover:text-slate-900">驗證證書</Link>
+        <Link href="/certificates" className="text-slate-600 hover:text-slate-900">我的證書</Link>
+        {session ? (
+          <>
+            <span className="text-slate-500">{session.user?.email}</span>
+            <button type="button" onClick={() => getSupabase().auth.signOut()} className="text-slate-600 hover:text-slate-900">登出</button>
+          </>
+        ) : (
+          <Link href="/login" className="rounded bg-slate-800 px-3 py-1.5 text-white hover:bg-slate-700">登入</Link>
+        )}
+      </nav>
       <div className="mx-auto max-w-2xl space-y-8">
         <header className="text-center">
           <h1 className="text-2xl font-bold text-slate-900">
@@ -195,20 +215,30 @@ export default function Home() {
                 身分驗證 ID：<code className="rounded bg-slate-100 px-1">{inquiryId}</code>
               </p>
             )}
-            <div className="mb-4 rounded-lg bg-emerald-50 p-4">
-              <p className="flex items-center gap-2 text-emerald-800">
-                <CheckCircle className="h-5 w-5" />
-                可下載數位認證證書（含 HMAC-SHA256 簽名）
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleDownloadCert}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"
-            >
-              <Download className="h-4 w-4" />
-              下載證書 JSON
-            </button>
+            {!accessToken ? (
+              <div className="rounded-lg bg-amber-50 p-4 text-amber-800">
+                <p className="mb-2">請先登入後再下載證書。</p>
+                <Link href="/login" className="text-sm font-medium underline">前往登入</Link>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 rounded-lg bg-emerald-50 p-4">
+                  <p className="flex items-center gap-2 text-emerald-800">
+                    <CheckCircle className="h-5 w-5" />
+                    可下載數位認證證書（後端簽名）
+                  </p>
+                </div>
+                {certError && <p className="mb-2 text-sm text-red-600">{certError}</p>}
+                <button
+                  type="button"
+                  onClick={handleDownloadCert}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"
+                >
+                  <Download className="h-4 w-4" />
+                  下載證書 JSON
+                </button>
+              </>
+            )}
           </section>
         )}
       </div>
