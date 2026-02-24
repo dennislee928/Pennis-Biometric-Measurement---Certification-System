@@ -6,6 +6,7 @@ import {
   getBlurScore,
   type MeasurementResult,
 } from '@/lib/measurementEngine';
+import { useI18n } from '@/lib/i18n/context';
 import { Camera, AlertCircle, Loader2 } from 'lucide-react';
 
 export type CaptureState = 'idle' | 'live' | 'captured' | 'error';
@@ -15,6 +16,8 @@ export interface CameraCaptureProps {
   onMeasurementReady?: (result: MeasurementResult) => void;
   /** 參考卡片框佔畫面寬度比例 (0.2 = 20%) */
   referenceFrameWidthRatio?: number;
+  /** 護照閉合比例 高/寬 (125/88)，不傳則用卡片比例 */
+  passportAspect?: number;
   /** 是否啟用敏感區域模糊 */
   enableBlur?: boolean;
   /** 最低亮度閾值 */
@@ -30,10 +33,13 @@ export function CameraCapture({
   onCapture,
   onMeasurementReady,
   referenceFrameWidthRatio = 0.25,
+  passportAspect,
   enableBlur = true,
   minLuminance = DEFAULT_MIN_LUMINANCE,
   minBlurScore = DEFAULT_MIN_BLUR_SCORE,
 }: CameraCaptureProps) {
+  const { t } = useI18n();
+  const frameAspect = passportAspect ?? 85.6 / 53.98;
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -67,7 +73,7 @@ export function CameraCapture({
       }
       setState('live');
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '無法取得相機';
+      const msg = e instanceof Error ? e.message : t('camera.error');
       setError(msg);
       setState('error');
     }
@@ -133,7 +139,7 @@ export function CameraCapture({
   const refW = w * referenceFrameWidthRatio;
   const refLeft = (w - refW) / 2;
   const refTop = h * 0.15;
-  const refBottom = refTop + refW * (85.6 / 53.98);
+  const refBottom = refTop + refW * frameAspect;
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -162,13 +168,13 @@ export function CameraCapture({
               className="camera-overlay__hint"
               style={{ left: 0, right: 0, top: refTop - 28 }}
             >
-              請將參考卡片對齊綠色框
+              {t('reference.passportHint')}
             </div>
             <div
               className="camera-overlay__hint"
               style={{ left: 0, right: 0, bottom: 24 }}
             >
-              對齊後按下「擷取」
+              {t('reference.captureHint')}
             </div>
           </div>
         )}
@@ -177,10 +183,10 @@ export function CameraCapture({
       {state === 'live' && (
         <div className="flex items-center gap-4 text-sm">
           <span className={envOk.light ? 'text-green-600' : 'text-amber-600'}>
-            {envOk.light ? '亮度足夠' : '光線不足'}
+            {envOk.light ? t('camera.bright') : t('camera.dark')}
           </span>
           <span className={envOk.sharp ? 'text-green-600' : 'text-amber-600'}>
-            {envOk.sharp ? '畫面清晰' : '畫面模糊'}
+            {envOk.sharp ? t('camera.sharp') : t('camera.blur')}
           </span>
         </div>
       )}
@@ -193,7 +199,7 @@ export function CameraCapture({
           className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-white transition hover:bg-emerald-700 disabled:opacity-50"
         >
           <Camera className="h-5 w-5" />
-          擷取
+          {t('camera.capture')}
         </button>
       )}
 
@@ -203,7 +209,7 @@ export function CameraCapture({
           onClick={reset}
           className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-700 hover:bg-slate-50"
         >
-          重新拍攝
+          {t('camera.retake')}
         </button>
       )}
 
@@ -216,7 +222,7 @@ export function CameraCapture({
             onClick={startCamera}
             className="ml-2 rounded bg-red-100 px-3 py-1 text-sm hover:bg-red-200"
           >
-            重試
+            {t('camera.retry')}
           </button>
         </div>
       )}
@@ -224,7 +230,7 @@ export function CameraCapture({
       {state === 'idle' && (
         <div className="flex items-center gap-2 text-slate-500">
           <Loader2 className="h-5 w-5 animate-spin" />
-          正在啟動相機…
+          {t('camera.starting')}
         </div>
       )}
     </div>

@@ -1,0 +1,231 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import confetti from 'canvas-confetti';
+import { initTfBackend } from '@/lib/tfBackend';
+import {
+  computePPMFromPassport,
+  measureLengthFromRegion,
+  type MeasurementResult,
+  type Point2D,
+} from '@/lib/measurementEngine';
+import { downloadCertificateAsJson, type CertificatePayload } from '@/lib/certificationProvider';
+import { issueCertificate } from '@/lib/api';
+import { useAuth } from '@/lib/useAuth';
+import { getSupabase } from '@/lib/supabase';
+import { useI18n } from '@/lib/i18n/context';
+import { CameraCapture } from '@/components/CameraCapture';
+import { usePersonaInquiry } from '@/components/PersonaInquiry';
+import { Shield, Download, Loader2, CheckCircle } from 'lucide-react';
+import Link from 'next/link';
+
+const REFERENCE_FRAME_WIDTH_RATIO = 0.25;
+/** Passport closed: 88mm x 125mm → height/width = 125/88 */
+const PASSPORT_ASPECT = 125 / 88;
+
+function getPassportCornersFromOverlay(videoWidth: number, videoHeight: number): [Point2D, Point2D, Point2D, Point2D] {
+  const refW = videoWidth * REFERENCE_FRAME_WIDTH_RATIO;
+  const refLeft = (videoWidth - refW) / 2;
+  const refTop = videoHeight * 0.15;
+  const refH = refW * PASSPORT_ASPECT;
+  return [
+    { x: refLeft, y: refTop },
+    { x: refLeft + refW, y: refTop },
+    { x: refLeft + refW, y: refTop + refH },
+    { x: refLeft, y: refTop + refH },
+  ];
+}
+
+function runMeasurement(imageData: ImageData, liveCaptured: boolean): MeasurementResult | null {
+  const { width, height } = imageData;
+  const corners = getPassportCornersFromOverlay(width, height);
+  const ppm = computePPMFromPassport(corners);
+  if (ppm <= 0) return null;
+  const targetRegionHeightPx = height * 0.35;
+  return measureLengthFromRegion(targetRegionHeightPx, ppm, liveCaptured);
+}
+
+export default function MeasurePage() {
+  const { t } = useI18n();
+  const [step, setStep] = useState<'camera' | 'measure' | 'verify' | 'cert'>('camera');
+  const [measurement, setMeasurement] = useState<MeasurementResult | null>(null);
+  const [certificate, setCertificate] = useState<CertificatePayload | null>(null);
+  const [inquiryId, setInquiryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    initTfBackend().catch(() => {});
+  }, []);
+
+  const handleCapture = useCallback((imageData: ImageData, live: boolean) => {
+    const result = runMeasurement(imageData, live);
+    if (result) {
+      setMeasurement(result);
+      setStep('measure');
+    }
+  }, []);
+
+  const { ready: personaReady, error: personaError, open: openPersona } = usePersonaInquiry(
+    process.env.NEXT_PUBLIC_PERSONA_TEMPLATE_ID || 'itmpl_placeholder',
+    (process.env.NEXT_PUBLIC_PERSONA_ENV as 'sandbox' | 'production') || 'sandbox',
+    {
+      onComplete: ({ inquiryId: id }) => {
+        setInquiryId(id);
+        setStep('cert');
+      },
+      onError: () => {},
+    }
+  );
+
+  const { session, accessToken } = useAuth();
+  const [certError, setCertError] = useState<string | null>(null);
+
+  const handleStartVerification = useCallback(() => {
+    setStep('verify');
+    openPersona();
+  }, [openPersona]);
+
+  const handleDownloadCert = useCallback(async () => {
+    if (!inquiryId || !measurement) return;
+    if (!accessToken) return;
+    setCertError(null);
+    try {
+      const cert = await issueCertificate(accessToken, inquiryId, measurement);
+      setCertificate(cert);
+      downloadCertificateAsJson(cert as CertificatePayload);
+      confetti({ particleCount: 80, spread: 60 });
+    } catch (e) {
+      setCertError(e instanceof Error ? e.message : t('error.issueFailed'));
+    }
+  }, [inquiryId, measurement, accessToken, t]);
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-4 py-8">
+      <nav className="mx-auto mb-6 flex max-w-2xl items-center justify-between text-sm">
+        <Link href="/" className="text-slate-600 hover:text-slate-900">{t('nav.home')}</Link>
+        <div className="flex items-center gap-4">
+          <Link href="/verify" className="text-slate-600 hover:text-slate-900">{t('nav.verify')}</Link>
+          <Link href="/certificates" className="text-slate-600 hover:text-slate-900">{t('nav.myCerts')}</Link>
+          {session ? (
+            <>
+              <span className="text-slate-500">{session.user?.email}</span>
+              <button type="button" onClick={() => getSupabase().auth.signOut()} className="text-slate-600 hover:text-slate-900">{t('nav.logout')}</button>
+            </>
+          ) : (
+            <Link href="/login" className="rounded bg-slate-800 px-3 py-1.5 text-white hover:bg-slate-700">{t('nav.login')}</Link>
+          )}
+        </div>
+      </nav>
+      <div className="mx-auto max-w-2xl space-y-8">
+        <header className="text-center">
+          <h1 className="text-2xl font-bold text-slate-900">{t('welcome.title')}</h1>
+          <p className="mt-2 text-sm text-slate-600">{t('welcome.subtitle')}</p>
+        </header>
+
+        {step === 'camera' && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold">{t('step1.title')}</h2>
+            <p className="mb-4 text-sm text-slate-600">{t('step1.hint')}</p>
+            <CameraCapture
+              onCapture={handleCapture}
+              referenceFrameWidthRatio={REFERENCE_FRAME_WIDTH_RATIO}
+              passportAspect={PASSPORT_ASPECT}
+              enableBlur={true}
+            />
+          </section>
+        )}
+
+        {step === 'measure' && measurement && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold">{t('step2.title')}</h2>
+            <div className="mb-4 rounded-lg bg-slate-100 p-4">
+              <p className="text-sm text-slate-600">{t('step2.length')}</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {measurement.lengthCm.toFixed(2)} cm
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                {t('step2.live')}: {measurement.liveCaptured ? t('step2.yes') : t('step2.no')} · PPM: {measurement.ppm.toFixed(1)}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setStep('camera')}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                {t('step2.retake')}
+              </button>
+              <button
+                type="button"
+                onClick={handleStartVerification}
+                disabled={!personaReady}
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {personaReady ? (
+                  <>
+                    <Shield className="h-4 w-4" />
+                    {t('step2.verify')}
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t('step2.loading')}
+                  </>
+                )}
+              </button>
+            </div>
+            {personaError && <p className="mt-2 text-sm text-amber-600">{personaError}</p>}
+          </section>
+        )}
+
+        {step === 'verify' && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold">{t('step3.title')}</h2>
+            <p className="mb-4 text-sm text-slate-600">{t('step3.hint')}</p>
+            <button
+              type="button"
+              onClick={openPersona}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+            >
+              {t('step3.openAgain')}
+            </button>
+          </section>
+        )}
+
+        {step === 'cert' && measurement && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold">{t('step4.title')}</h2>
+            {inquiryId && (
+              <p className="mb-4 text-sm text-slate-600">
+                {t('step4.inquiryId')}: <code className="rounded bg-slate-100 px-1">{inquiryId}</code>
+              </p>
+            )}
+            {!accessToken ? (
+              <div className="rounded-lg bg-amber-50 p-4 text-amber-800">
+                <p className="mb-2">{t('step4.loginRequired')}</p>
+                <Link href="/login" className="text-sm font-medium underline">{t('step4.goLogin')}</Link>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 rounded-lg bg-emerald-50 p-4">
+                  <p className="flex items-center gap-2 text-emerald-800">
+                    <CheckCircle className="h-5 w-5" />
+                    {t('step4.certReady')}
+                  </p>
+                </div>
+                {certError && <p className="mb-2 text-sm text-red-600">{certError}</p>}
+                <button
+                  type="button"
+                  onClick={handleDownloadCert}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"
+                >
+                  <Download className="h-4 w-4" />
+                  {t('step4.downloadJson')}
+                </button>
+              </>
+            )}
+          </section>
+        )}
+      </div>
+    </main>
+  );
+}

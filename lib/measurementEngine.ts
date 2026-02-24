@@ -4,6 +4,8 @@
  */
 
 export const REFERENCE_CARD_WIDTH_CM = 8.56; // 標準信用卡寬度 (cm)
+/** 護照閉合時可見寬度約 88mm */
+export const REFERENCE_PASSPORT_WIDTH_CM = 8.8;
 
 export interface Point2D {
   x: number;
@@ -33,6 +35,15 @@ export function computePPMFromCard(
   const avgWidthPx = (topWidth + bottomWidth) / 2;
   if (avgWidthPx <= 0) return 0;
   return avgWidthPx / cardWidthCm;
+}
+
+/**
+ * 從護照（閉合）四角計算 PPM
+ */
+export function computePPMFromPassport(
+  corners: [Point2D, Point2D, Point2D, Point2D]
+): number {
+  return computePPMFromCard(corners, REFERENCE_PASSPORT_WIDTH_CM);
 }
 
 /**
